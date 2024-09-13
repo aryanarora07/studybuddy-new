@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,14 @@ export function AuthPageComponent() {
   const [signupError, setSignupError] = useState('')
   const [loginError, setLoginError] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const emailParam = searchParams.get('email')
+    if (emailParam) {
+      setEmail(decodeURIComponent(emailParam))
+    }
+  }, [searchParams])
 
   const calculatePasswordStrength = (password) => {
     let strength = 0
@@ -42,7 +50,10 @@ export function AuthPageComponent() {
       })
       if (response.status === 201) {
         console.log("success")
-        router.push('/') // Redirect to dashboard after successful signup
+        // Save JWT token and user ID in local storage
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('userId', response.data.userId)
+        router.push('/profilesetup') // Redirect to profile setup after successful signup
       }
     } catch (error) {
       setSignupError(error.response?.data?.error || 'An error occurred during signup')
@@ -59,8 +70,9 @@ export function AuthPageComponent() {
       })
       if (response.status === 200) {
         localStorage.setItem('token', response.data.token) // Store the token
+        localStorage.setItem('userId', response.data.userId) // Store the user ID
         console.log("success")
-        router.push('/') // Redirect to dashboard after successful login
+        router.push('/findpartner') // Redirect to profile setup after successful login
       }
     } catch (error) {
       setLoginError(error.response?.data?.error || 'An error occurred during login')
