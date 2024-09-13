@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 const port = 4000;
 
 
+
 app.use(express.json());
 app.use(cors({
   origin: 'http://localhost:3000', // Replace with your frontend's URL
@@ -61,70 +62,99 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Update user profile completely
-app.post('/api/profile/update', async (req, res) => {
-    const { userId, major, subjects, availability, location, bio, studyPreference, profileVisibility, profilePicture } = req.body;
-  
-    try {
-      const updatedProfile = await prisma.userProfile.upsert({
-        where: { userId: parseInt(userId) },
-        create: {
-          userId: parseInt(userId),
-          major,
-          subjects,
-          availability,
-          location,
-          bio,
-          studyPreference,
-          profileVisibility,
-          profilePicture,
-        },
-        update: {
-          major,
-          subjects,
-          availability,
-          location,
-          bio,
-          studyPreference,
-          profileVisibility,
-          profilePicture,
-        },
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true
-            }
-          }
-        }
-      });
-  
-      res.status(200).json({ message: 'Profile updated successfully', profile: updatedProfile });
-    } catch (error) {
-      res.status(400).json({ error: 'Profile update failed', message: error.message });
-    }
-  });
-  
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
-
-
 
 
 // Add this middleware function for authentication
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+  
+    if (token == null) return res.sendStatus(401);
+  
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) return res.sendStatus(403);
+      req.user = user;
+      next();
+    });
+  };
 
-  if (token == null) return res.sendStatus(401);
+// Update user profile completely
+app.post('/api/profile/update', authenticateToken, async (req, res) => {
+  const { userId, name, major, subjects, availability, location, bio, studyPreference, profileVisibility, profilePicture } = req.body;
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-};
+  try {
+    // Update user name
+    await prisma.user.update({
+      where: { id: parseInt(userId) },
+      data: { name }
+    });
+
+    const updatedProfile = await prisma.userProfile.upsert({
+      where: { userId: parseInt(userId) },
+      create: {
+        userId: parseInt(userId),
+        major,
+        subjects,
+        availability,
+        location,
+        bio,
+        studyPreference,
+        profileVisibility,
+        profilePicture,
+      },
+      update: {
+        major,
+        subjects,
+        availability,
+        location,
+        bio,
+        studyPreference,
+        profileVisibility,
+        profilePicture,
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({ message: 'Profile updated successfully', profile: updatedProfile });
+  } catch (error) {
+    res.status(400).json({ error: 'Profile update failed', message: error.message });
+  }
+});
+
+// Add this new endpoint to fetch user profile
+app.get('/api/profile/:userId', authenticateToken, async (req, res) => {
+  const userId = parseInt(req.params.userId);
+
+  try {
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId: userId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (profile) {
+      res.json({ profile });
+    } else {
+      res.status(404).json({ error: 'Profile not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch profile', message: error.message });
+  }
+});
+
 
 // Update the study partners route to use authentication
 app.get('/api/study-partners', authenticateToken, async (req, res) => {
@@ -180,6 +210,9 @@ app.get('/api/auth/check', authenticateToken, async (req, res) => {
   }
 });
 
-// Add this new endpoint
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+}); 
 
 

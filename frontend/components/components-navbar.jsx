@@ -12,8 +12,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useRouter } from 'next/navigation';
 
 export function Navbar() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Clear all items from localStorage
+    localStorage.clear();
+    
+    // Redirect to the auth page
+    router.push('/auth');
+  };
+
+  const handleProfileClick = () => {
+    router.push('/profilesetup');
+  };
+
   return (
     (<nav
       className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
@@ -62,10 +77,10 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleProfileClick}>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Log out</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleLogout}>Log out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
