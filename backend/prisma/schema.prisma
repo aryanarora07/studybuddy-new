@@ -21,6 +21,15 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   userProfile  UserProfile?
+  rooms        Room[]
+}
+
+model Room {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  participants User[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model UserProfile {

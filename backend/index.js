@@ -3,21 +3,30 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
 const prisma = new PrismaClient();
 const port = 4000;
 
-
-
 app.use(express.json());
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your frontend's URL
+  origin: 'http://localhost:3000',
   credentials: true
 }));
 
 // Landing page route
-app.get('/', async  (req, res) => { 
+app.get('/', async (req, res) => { 
   res.json({ message: 'Welcome to the landing page' });
 });
 
@@ -30,7 +39,6 @@ app.post('/api/auth/signup', async (req, res) => {
       data: { name, email, password: hashedPassword },
     });
 
-    // Generate JWT token
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '6h' });
 
     res.status(201).json({
@@ -62,28 +70,25 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-
-
-// Add this middleware function for authentication
+// Authentication middleware
 const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-  
-    if (token == null) return res.sendStatus(401);
-  
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-      if (err) return res.sendStatus(403);
-      req.user = user;
-      next();
-    });
-  };
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-// Update user profile completely
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
+// Update user profile
 app.post('/api/profile/update', authenticateToken, async (req, res) => {
   const { userId, name, major, subjects, availability, location, bio, studyPreference, profileVisibility, profilePicture } = req.body;
 
   try {
-    // Update user name
     await prisma.user.update({
       where: { id: parseInt(userId) },
       data: { name }
@@ -128,7 +133,7 @@ app.post('/api/profile/update', authenticateToken, async (req, res) => {
   }
 });
 
-// Add this new endpoint to fetch user profile
+// Fetch user profile
 app.get('/api/profile/:userId', authenticateToken, async (req, res) => {
   const userId = parseInt(req.params.userId);
 
@@ -155,11 +160,10 @@ app.get('/api/profile/:userId', authenticateToken, async (req, res) => {
   }
 });
 
-
-// Update the study partners route to use authentication
+// Fetch study partners
 app.get('/api/study-partners', authenticateToken, async (req, res) => {
   try {
-    const loggedInUserId = req.user.userId; // Now we can safely use the user ID from the token
+    const loggedInUserId = req.user.userId;
 
     const studyPartners = await prisma.userProfile.findMany({
       where: {
@@ -193,7 +197,7 @@ app.get('/api/study-partners', authenticateToken, async (req, res) => {
   }
 });
 
-// Add this new endpoint for checking authentication status
+// Check authentication status
 app.get('/api/auth/check', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -210,9 +214,72 @@ app.get('/api/auth/check', authenticateToken, async (req, res) => {
   }
 });
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('New client connected');
 
-app.listen(port, () => {
+  socket.on('joinRoom', (roomName) => {
+    socket.join(roomName);
+    console.log(`User joined room: ${roomName}`);
+  });
+
+  socket.on('leaveRoom', (roomName) => {
+    socket.leave(roomName);
+    console.log(`User left room: ${roomName}`);
+  });
+
+  socket.on('sendMessage', (data) => {
+    io.to(data.roomName).emit('message', data.message);
+  });
+
+  socket.on('drawLine', (data) => {
+    socket.to(data.roomName).emit('drawLine', data.line);
+  });
+
+  socket.on('updateDocument', (data) => {
+    socket.to(data.roomName).emit('documentUpdate', data.content);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
+
+// Add this new endpoint for creating/joining a room
+app.post('/api/rooms', authenticateToken, async (req, res) => {
+  const { roomName } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    const room = await prisma.room.upsert({
+      where: { name: roomName },
+      update: {
+        participants: {
+          connect: { id: userId }
+        }
+      },
+      create: {
+        name: roomName,
+        participants: {
+          connect: { id: userId }
+        }
+      },
+      include: {
+        participants: true
+      }
+    });
+
+    res.status(200).json({ message: 'Joined room successfully', room });
+  } catch (error) {
+    console.error('Error joining room:', error);
+    res.status(400).json({ error: 'Failed to join room', message: error.message });
+  }
+});
+
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
-}); 
+});
+
+console.log('JWT_SECRET:', process.env.JWT_SECRET);
 
 

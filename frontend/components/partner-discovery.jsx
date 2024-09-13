@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, MapPin, MessageCircle, Star } from "lucide-react";
 import { Navbar } from './components-navbar';
+import { VirtualStudyRoomComponent } from './virtual-study-room'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 export function PartnerDiscovery() {
   const router = useRouter() // Add this line
@@ -23,6 +25,7 @@ export function PartnerDiscovery() {
   const [onlineOnly, setOnlineOnly] = useState(false)
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPartner, setSelectedPartner] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -56,6 +59,10 @@ export function PartnerDiscovery() {
     (selectedMajor === 'all' || partner.major === selectedMajor) &&
     (!onlineOnly || partner.isOnline)
   )
+
+  const handleConnect = (partner) => {
+    setSelectedPartner(partner)
+  }
 
   return (
     <>
@@ -139,9 +146,22 @@ export function PartnerDiscovery() {
                         </div>
                       </CardContent>
                       <CardFooter>
-                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
-                          Connect
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                              onClick={() => handleConnect(partner)}
+                            >
+                              Connect
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl">
+                            <DialogHeader>
+                              <DialogTitle>Virtual Study Room with {partner.user.name}</DialogTitle>
+                            </DialogHeader>
+                            <VirtualStudyRoomComponent partnerName={partner.user.name} />
+                          </DialogContent>
+                        </Dialog>
                       </CardFooter>
                     </Card>
                   ))}
