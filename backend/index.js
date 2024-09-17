@@ -1,6 +1,5 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const http = require('http');
@@ -34,9 +33,8 @@ app.get('/', async (req, res) => {
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password } = req.body;
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword },
+      data: { name, email, password }, // Store password as plain text
     });
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '6h' });
@@ -59,8 +57,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
+    if (user.password !== password) { // Compare passwords directly
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '6h' });
